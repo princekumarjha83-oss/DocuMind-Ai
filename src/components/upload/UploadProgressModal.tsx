@@ -58,6 +58,11 @@ export const UploadProgressModal: React.FC = () => {
                       <p className="text-[10px] text-slate-400">
                         {formatBytes(item.size)} • {(item.status || 'processing').toUpperCase()}
                       </p>
+                      {item.status === 'error' && item.error && (
+                        <p className="text-[10px] text-rose-500 font-medium truncate pt-0.5" title={item.error}>
+                          {item.error}
+                        </p>
+                      )}
                     </div>
                   </div>
 

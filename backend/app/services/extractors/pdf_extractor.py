@@ -5,6 +5,12 @@ from app.services.extractors.base import BaseExtractor, ExtractedSection, Extrac
 
 logger = logging.getLogger("documind.extractor.pdf")
 
+def clean_pdf_text(text: Optional[str]) -> str:
+    if not text:
+        return ""
+    # Strip null bytes and surrogate code points that crash database storage
+    return text.replace("\x00", "").encode("utf-8", "ignore").decode("utf-8", "ignore").strip()
+
 class PDFExtractor(BaseExtractor):
     def extract(self, file_path: str) -> ExtractionResult:
         result = ExtractionResult()
@@ -19,11 +25,11 @@ class PDFExtractor(BaseExtractor):
             doc = fitz.open(file_path)
             result.page_count = len(doc)
             result.metadata = {
-                "title": doc.metadata.get("title") or "",
-                "author": doc.metadata.get("author") or "",
-                "subject": doc.metadata.get("subject") or "",
-                "creator": doc.metadata.get("creator") or "",
-                "producer": doc.metadata.get("producer") or "",
+                "title": clean_pdf_text(doc.metadata.get("title")),
+                "author": clean_pdf_text(doc.metadata.get("author")),
+                "subject": clean_pdf_text(doc.metadata.get("subject")),
+                "creator": clean_pdf_text(doc.metadata.get("creator")),
+                "producer": clean_pdf_text(doc.metadata.get("producer")),
                 "page_count": len(doc)
             }
 
@@ -31,7 +37,8 @@ class PDFExtractor(BaseExtractor):
             for page_index in range(len(doc)):
                 page_num = page_index + 1
                 page = doc[page_index]
-                text = page.get_text("text").strip()
+                raw_page_text = page.get_text("text")
+                text = clean_pdf_text(raw_page_text)
 
                 if text:
                     all_page_texts.append(text)

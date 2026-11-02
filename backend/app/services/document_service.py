@@ -100,7 +100,8 @@ class DocumentService:
 
             extraction = extract_document(doc.storage_path)
             doc.page_count = extraction.page_count
-            doc.extracted_text = extraction.raw_text[:10000]  # Store preview snippet
+            cleaned_preview = (extraction.raw_text or "").replace("\x00", "").encode("utf-8", "ignore").decode("utf-8", "ignore")
+            doc.extracted_text = cleaned_preview[:10000]
             doc.is_ocr_used = extraction.is_ocr_used
 
             # 2. Stage: Chunking (Progress 45%)
@@ -112,13 +113,23 @@ class DocumentService:
             chunks = chunking_service.chunk_extraction_result(extraction)
             doc.chunks_count = len(chunks)
 
+            # Defensive handling for documents with minimal or non-extractable text
+            if not chunks:
+                doc.processing_status = "ready"
+                doc.processing_stage = "Ready (minimal text detected)"
+                doc.processing_progress = 100
+                doc.summary = "Document indexed. Minimal selectable text was detected."
+                doc.updated_at = get_utc_now()
+                await db.commit()
+                return
+
             # 3. Stage: Embedding (Progress 70%)
             doc.processing_status = "embedding"
             doc.processing_stage = "Vectorizing semantic embeddings"
             doc.processing_progress = 70
             await db.commit()
 
-            chunk_texts = [c.content for c in chunks]
+            chunk_texts = [(c.content or "").replace("\x00", "").encode("utf-8", "ignore").decode("utf-8", "ignore") for c in chunks]
             embeddings = await embedding_service.get_embeddings_batch(chunk_texts)
 
             # 4. Stage: Indexing (Progress 90%)
@@ -132,11 +143,12 @@ class DocumentService:
 
             for idx, ch in enumerate(chunks):
                 vec = embeddings[idx] if idx < len(embeddings) else []
+                clean_chunk_content = (ch.content or "").replace("\x00", "").encode("utf-8", "ignore").decode("utf-8", "ignore")
                 chunk_record = DocumentChunk(
                     document_id=doc.id,
                     owner_id=doc.owner_id,
                     chunk_index=ch.chunk_index,
-                    content=ch.content,
+                    content=clean_chunk_content,
                     page_number=ch.page_number,
                     slide_number=ch.slide_number,
                     sheet_name=ch.sheet_name,

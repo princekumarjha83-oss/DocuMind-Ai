@@ -49,14 +49,16 @@ class EmbeddingService:
 
         # Bag of words + character n-grams hashing
         for token in tokens:
-            token_hash = int(hashlib.md5(token.encode("utf-8")).hexdigest()[:8], 16)
+            token_bytes = token.encode("utf-8", "ignore")
+            token_hash = int(hashlib.md5(token_bytes).hexdigest()[:8], 16)
             dim = token_hash % self.EMBEDDING_DIM
             vec[dim] += 1.0
 
             # Subword bi-grams for semantic inflection capture
             for i in range(len(token) - 2):
                 ngram = token[i:i+3]
-                ng_hash = int(hashlib.sha256(ngram.encode("utf-8")).hexdigest()[:8], 16)
+                ng_bytes = ngram.encode("utf-8", "ignore")
+                ng_hash = int(hashlib.sha256(ng_bytes).hexdigest()[:8], 16)
                 dim_ng = ng_hash % self.EMBEDDING_DIM
                 vec[dim_ng] += 0.35
 
