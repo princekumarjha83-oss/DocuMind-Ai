@@ -38,58 +38,161 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Simple Markdown formatting helper for paragraphs, lists, bold text, and headers
+  // Professional Markdown formatting with table, list, header, and inline styling
   const renderFormattedContent = (content: string) => {
-    const lines = content.split('\n')
+    const rawLines = content.split('\n')
+    const blocks: React.ReactNode[] = []
+    let i = 0
+
+    while (i < rawLines.length) {
+      const line = rawLines[i]
+
+      // 1. Table block (lines starting and ending with |)
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        const tableLines: string[] = []
+        while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+          tableLines.push(rawLines[i].trim())
+          i++
+        }
+
+        // Parse rows, filtering out markdown separator |---|---|
+        const parsedRows = tableLines
+          .filter(tl => !/^[|\s:-]+$/.test(tl))
+          .map(tl => tl.split('|').slice(1, -1).map(c => c.trim()))
+
+        if (parsedRows.length > 0) {
+          const headerRow = parsedRows[0]
+          const bodyRows = parsedRows.slice(1)
+          blocks.push(
+            <div key={`tbl-${i}`} className="my-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    {headerRow.map((h, hIdx) => (
+                      <th key={hIdx} className="px-3.5 py-2.5 font-bold">{formatInline(h)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60 bg-white dark:bg-slate-900/40">
+                  {bodyRows.map((row, rIdx) => (
+                    <tr key={rIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      {row.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-3.5 py-2.5 text-slate-700 dark:text-slate-300 leading-relaxed">
+                          {formatInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+        continue
+      }
+
+      // 2. Blockquotes
+      if (line.startsWith('> ') || line === '>') {
+        const quoteText = line.replace(/^>\s*/, '')
+        blocks.push(
+          <blockquote key={`bq-${i}`} className="pl-3.5 border-l-2 border-primary/60 italic text-slate-600 dark:text-slate-400 my-2">
+            {formatInline(quoteText)}
+          </blockquote>
+        )
+        i++
+        continue
+      }
+
+      // 3. Headers
+      if (line.startsWith('### ')) {
+        blocks.push(
+          <h4 key={`h4-${i}`} className="text-sm font-bold text-slate-900 dark:text-white pt-2.5 pb-0.5">
+            {formatInline(line.replace('### ', ''))}
+          </h4>
+        )
+        i++
+        continue
+      }
+      if (line.startsWith('## ')) {
+        blocks.push(
+          <h3 key={`h3-${i}`} className="text-base font-bold text-slate-900 dark:text-white pt-3 pb-1">
+            {formatInline(line.replace('## ', ''))}
+          </h3>
+        )
+        i++
+        continue
+      }
+
+      // 4. Bullet lists
+      if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+        blocks.push(
+          <li key={`li-${i}`} className="ml-4 list-disc text-slate-700 dark:text-slate-300 leading-relaxed">
+            {formatInline(line.replace(/^[-•*]\s*/, ''))}
+          </li>
+        )
+        i++
+        continue
+      }
+
+      // 5. Numbered lists
+      if (/^\d+\.\s/.test(line)) {
+        blocks.push(
+          <li key={`num-${i}`} className="ml-4 list-decimal text-slate-700 dark:text-slate-300 leading-relaxed">
+            {formatInline(line.replace(/^\d+\.\s*/, ''))}
+          </li>
+        )
+        i++
+        continue
+      }
+
+      // 6. Empty line spacer
+      if (line.trim() === '') {
+        blocks.push(<div key={`sp-${i}`} className="h-1.5" />)
+        i++
+        continue
+      }
+
+      // 7. Normal paragraph
+      blocks.push(
+        <p key={`p-${i}`} className="leading-relaxed">
+          {formatInline(line)}
+        </p>
+      )
+      i++
+    }
+
     return (
-      <div className="space-y-2 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
-        {lines.map((line, idx) => {
-          if (line.startsWith('### ')) {
-            return (
-              <h4 key={idx} className="text-sm font-bold text-slate-900 dark:text-white pt-2">
-                {line.replace('### ', '')}
-              </h4>
-            )
-          }
-          if (line.startsWith('## ')) {
-            return (
-              <h3 key={idx} className="text-base font-bold text-slate-900 dark:text-white pt-2">
-                {line.replace('## ', '')}
-              </h3>
-            )
-          }
-          if (line.startsWith('- ') || line.startsWith('• ')) {
-            return (
-              <li key={idx} className="ml-4 list-disc text-slate-700 dark:text-slate-300">
-                {formatInline(line.replace(/^[-•]\s*/, ''))}
-              </li>
-            )
-          }
-          if (/^\d+\.\s/.test(line)) {
-            return (
-              <li key={idx} className="ml-4 list-decimal text-slate-700 dark:text-slate-300">
-                {formatInline(line.replace(/^\d+\.\s*/, ''))}
-              </li>
-            )
-          }
-          if (line.trim() === '') {
-            return <div key={idx} className="h-1" />
-          }
-          return <p key={idx}>{formatInline(line)}</p>
-        })}
+      <div className="space-y-1.5 text-sm leading-relaxed text-slate-800 dark:text-slate-200">
+        {blocks}
       </div>
     )
   }
 
   const formatInline = (text: string) => {
-    // Process bold **text**
-    const parts = text.split(/(\*\*.*?\*\*)/g)
+    // Process bold (**text**), code (`text`), and italic (*text*)
+    const tokenRegex = /(\*\*.*?\*\*|`.*?`|\*[^*\n]+?\*)/g
+    const parts = text.split(tokenRegex)
+
     return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
+      if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
         return (
           <strong key={i} className="font-bold text-slate-900 dark:text-white">
             {part.slice(2, -2)}
           </strong>
+        )
+      }
+      if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
+        return (
+          <code key={i} className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-primary text-xs font-mono">
+            {part.slice(1, -1)}
+          </code>
+        )
+      }
+      if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+        return (
+          <em key={i} className="italic text-slate-700 dark:text-slate-300">
+            {part.slice(1, -1)}
+          </em>
         )
       }
       return part
