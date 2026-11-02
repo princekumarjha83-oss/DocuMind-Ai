@@ -16,6 +16,7 @@ class CitationSchema(BaseModel):
     sectionHeading: Optional[str] = Field(alias="section_heading", default=None)
     section_heading: Optional[str] = None
     excerpt: str
+    full_content: Optional[str] = None
     relevanceScore: float = Field(alias="relevance_score", default=0.9)
     relevance_score: float = 0.9
 

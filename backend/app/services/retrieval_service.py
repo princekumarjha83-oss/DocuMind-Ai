@@ -91,13 +91,14 @@ class RetrievalService:
         return final_ranked[:top_k]
 
     def build_citations(self, ranked_results: List[Tuple[DocumentChunk, Document, float]]) -> List[CitationSchema]:
-        """Convert retrieved chunks into structured, verified citations with 100% semantic grounding."""
+        """Convert retrieved chunks into structured, verified citations with full content and 100% semantic grounding."""
         citations = []
         for chunk, doc, _ in ranked_results:
-            # Excerpt: clean first 250 characters
-            excerpt = chunk.content.strip()
-            if len(excerpt) > 250:
-                excerpt = excerpt[:247] + "..."
+            full_text = chunk.content.strip()
+            # Clean excerpt for UI preview card (350 chars)
+            excerpt = full_text
+            if len(excerpt) > 350:
+                excerpt = excerpt[:347] + "..."
 
             citations.append(
                 CitationSchema(
@@ -110,6 +111,7 @@ class RetrievalService:
                     row_number=chunk.row_number,
                     section_heading=chunk.section_heading,
                     excerpt=excerpt,
+                    full_content=full_text,
                     relevance_score=1.0
                 )
             )
