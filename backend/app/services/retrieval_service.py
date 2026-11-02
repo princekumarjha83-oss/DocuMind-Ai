@@ -88,7 +88,27 @@ class RetrievalService:
             scored_map[chunk.id] = (chunk, doc, calibrated_score)
 
         final_ranked = sorted(scored_map.values(), key=lambda x: x[2], reverse=True)
-        return final_ranked[:top_k]
+        
+        # Check if this is an overview or open-ended question about the document
+        overview_keywords = {"important", "summary", "summarize", "overview", "main", "key", "about", "explain", "findings", "purpose", "takeaway", "takeaways", "introduction", "tell"}
+        is_overview = bool(set(re.findall(r"\w+", query.lower())) & overview_keywords)
+
+        selected_chunks = list(final_ranked[:top_k])
+        selected_ids = {chunk.id for chunk, _, _ in selected_chunks}
+
+        if is_overview and candidates:
+            # Prepend the foundational introduction chunk (chunk_index == 0) if not already selected
+            intro_candidate = next((c for c in candidates if c[0].chunk_index == 0 and c[0].id not in selected_ids), None)
+            if intro_candidate:
+                selected_chunks.insert(0, (intro_candidate[0], intro_candidate[1], 1.0))
+                selected_ids.add(intro_candidate[0].id)
+
+            # Include second chunk if available and not yet present
+            intro_candidate_1 = next((c for c in candidates if c[0].chunk_index == 1 and c[0].id not in selected_ids), None)
+            if intro_candidate_1 and len(selected_chunks) <= top_k + 1:
+                selected_chunks.insert(1, (intro_candidate_1[0], intro_candidate_1[1], 0.98))
+
+        return selected_chunks[:top_k + 2]
 
     def build_citations(self, ranked_results: List[Tuple[DocumentChunk, Document, float]]) -> List[CitationSchema]:
         """Convert retrieved chunks into structured, verified citations with full content and 100% semantic grounding."""
